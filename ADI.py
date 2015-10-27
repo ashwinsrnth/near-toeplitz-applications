@@ -29,7 +29,8 @@ dt = 1.0
 u = np.zeros((ny, nx), dtype=np.float64)
 u[:,:] = 0.5
 u[:,0] = 1.0
-u2 = u.copy()
+tmp_x = np.zeros((ny, nx), dtype=np.float64)
+tmp_y = np.zeros((nx, ny), dtype=np.float64)
 
 # Initialize tridiagonal system coefficients:
 a_x = np.ones(nx)*1./(dx*dx)
@@ -58,20 +59,20 @@ for step in range(100):
         d_x[1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dy*dy)
         d_x[0] = u[i,0]
         d_x[-1] = u[i,-1]
-        u2[i,:] = tridiagonal_solve(a_x, b_x, c_x, d_x)
+        tmp_x[i,:] = tridiagonal_solve(a_x, b_x, c_x, d_x)
+
+    u[1:-1, :] = tmp_x[1:-1, :]
+    u[...] = u.transpose().copy()
 
     # Implicit y, explicit x:
-    u2[...] = u2.transpose().copy()
-    u[...] = u.transpose().copy()
-
     for i in range(1, nx-1):
-        d_y[1:-1] = -2*u2[i,1:-1]/dt - (u2[i-1,1:-1] - 2*u2[i,1:-1] + u2[i+1,1:-1])/(dx*dx)
-        d_y[0] = u2[i,0]
-        d_y[-1] = u2[i,-1]
-        u[i,:] = tridiagonal_solve(a_y, b_y, c_y, d_y)
+        d_y[1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dx*dx)
+        d_y[0] = u[i,0]
+        d_y[-1] = u[i,-1]
+        tmp_y[i,:] = tridiagonal_solve(a_y, b_y, c_y, d_y)
     
+    u[1:-1, :] = tmp_y[1:-1, :]
     u[...] = u.transpose().copy()
-    u2[...] = u2.transpose().copy()
 
 plt.pcolor(u)
 plt.colorbar()
