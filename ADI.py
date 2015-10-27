@@ -30,8 +30,6 @@ dt = 1.0
 u = np.zeros((ny, nx), dtype=np.float64)
 u[:,:] = 0.5
 u[:,0] = 1.0
-tmp_x = np.zeros((ny, nx), dtype=np.float64)
-tmp_y = np.zeros((nx, ny), dtype=np.float64)
 
 # Initialize tridiagonal solvers
 solver_x = near_toeplitz.NearToeplitzSolver(nx, ny-2,
