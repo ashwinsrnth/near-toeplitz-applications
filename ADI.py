@@ -20,7 +20,7 @@ def tridiagonal_solve(a, b, c, rhs):
     return x
 
 L = 1.0
-nx = 32
+nx = 64
 ny = 32
 dx = L/(nx-1)
 dy = L/(ny-1)
@@ -36,8 +36,8 @@ solver_x = near_toeplitz.NearToeplitzSolver(nx, ny-2,
         (1., 0., 1./(dx*dx), -2.*(1./dt + 1./(dx*dx)), 1./(dx*dx), 0., 1.))
 solver_y = near_toeplitz.NearToeplitzSolver(ny, nx-2,
         (1., 0., 1./(dy*dy), -2.*(1./dt + 1./(dy*dy)), 1./(dy*dy), 0., 1.))
-d_x = np.zeros((ny, nx), dtype=np.float64)
-d_y = np.zeros((nx, ny), dtype=np.float64)
+d_x = u.copy()
+d_y = u.transpose().copy() 
 
 # Time marching:
 for step in range(100):
@@ -49,8 +49,7 @@ for step in range(100):
         d_x[i,-1] = u[i,-1]
 
     solver_x.solve(d_x[1:-1,:].ravel())
-    u[1:-1, :] = d_x[1:-1, :]
-    u[...] = u.transpose().copy()
+    u = d_x.transpose()
     
     # Implicit y, explicit x:
     for i in range(1, nx-1):
@@ -59,8 +58,7 @@ for step in range(100):
         d_y[i,-1] = u[i,-1]
     
     solver_y.solve(d_y[1:-1,:].ravel())
-    u[1:-1, :] = d_y[1:-1, :]
-    u[...] = u.transpose().copy()
+    u = d_y.transpose()
 
 plt.pcolor(u)
 plt.colorbar()
