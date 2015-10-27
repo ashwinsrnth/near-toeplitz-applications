@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.linalg import solve_banded
 import matplotlib.pyplot as plt
+from cpu import near_toeplitz
 
 def tridiagonal_solve(a, b, c, rhs):
     '''
@@ -23,7 +24,7 @@ nx = 32
 ny = 32
 dx = L/(nx-1)
 dy = L/(ny-1)
-dt = 1.0
+dt = 1.0 
 
 # Initialize values:
 u = np.zeros((ny, nx), dtype=np.float64)
@@ -32,46 +33,35 @@ u[:,0] = 1.0
 tmp_x = np.zeros((ny, nx), dtype=np.float64)
 tmp_y = np.zeros((nx, ny), dtype=np.float64)
 
-# Initialize tridiagonal system coefficients:
-a_x = np.ones(nx)*1./(dx*dx)
-b_x = np.ones(nx)*-(2./dt + 2./(dx*dx))
-c_x = np.ones(nx)*1./(dx*dx)
-d_x = np.zeros(nx, dtype=np.float64)
-b_x[0] = 1.
-c_x[0] = 0.
-a_x[-1] = 0.
-b_x[-1] = 1.
-
-a_y = np.ones(ny)*1./(dy*dy)
-b_y = np.ones(ny)*-(2./dt + 2./(dy*dy))
-c_y = np.ones(ny)*1./(dy*dy)
-d_y = np.zeros(ny, dtype=np.float64)
-b_y[0] = 1.
-c_y[0] = 0.
-a_y[-1] = 0.
-b_y[-1] = 1.
+# Initialize tridiagonal solvers
+solver_x = near_toeplitz.NearToeplitzSolver(nx, ny-2,
+        (1., 0., 1./(dx*dx), -2.*(1./dt + 1./(dx*dx)), 1./(dx*dx), 0., 1.))
+solver_y = near_toeplitz.NearToeplitzSolver(ny, nx-2,
+        (1., 0., 1./(dy*dy), -2.*(1./dt + 1./(dy*dy)), 1./(dy*dy), 0., 1.))
+d_x = np.zeros((ny, nx), dtype=np.float64)
+d_y = np.zeros((nx, ny), dtype=np.float64)
 
 # Time marching:
 for step in range(100):
 
     # Implicit x, explicit y:
     for i in range(1, ny-1):
-        d_x[1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dy*dy)
-        d_x[0] = u[i,0]
-        d_x[-1] = u[i,-1]
-        tmp_x[i,:] = tridiagonal_solve(a_x, b_x, c_x, d_x)
+        d_x[i,1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dy*dy)
+        d_x[i,0] = u[i,0]
+        d_x[i,-1] = u[i,-1]
 
-    u[1:-1, :] = tmp_x[1:-1, :]
+    solver_x.solve(d_x[1:-1,:].ravel())
+    u[1:-1, :] = d_x[1:-1, :]
     u[...] = u.transpose().copy()
-
+    
     # Implicit y, explicit x:
     for i in range(1, nx-1):
-        d_y[1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dx*dx)
-        d_y[0] = u[i,0]
-        d_y[-1] = u[i,-1]
-        tmp_y[i,:] = tridiagonal_solve(a_y, b_y, c_y, d_y)
+        d_y[i,1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dx*dx)
+        d_y[i,0] = u[i,0]
+        d_y[i,-1] = u[i,-1]
     
-    u[1:-1, :] = tmp_y[1:-1, :]
+    solver_y.solve(d_y[1:-1,:].ravel())
+    u[1:-1, :] = d_y[1:-1, :]
     u[...] = u.transpose().copy()
 
 plt.pcolor(u)
