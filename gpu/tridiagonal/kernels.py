@@ -10,7 +10,7 @@ def render_kernel(template_filename, out_filename, **kwargs):
         kernel_template = f.read()
     tpl = jinja2.Template(kernel_template)
     kernel = tpl.render(**kwargs)
-    with open(out_filename, 'w') as f:
+    with open(src_dir + '/' + out_filename, 'w') as f:
         f.write(kernel)
 
 def get_funcs(filename, *args):

@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import solve_banded
 import matplotlib.pyplot as plt
-from cpu import near_toeplitz
+from tridiagonal import near_toeplitz
 
 def tridiagonal_solve(a, b, c, rhs):
     '''
@@ -45,8 +45,6 @@ for step in range(100):
     # Implicit x, explicit y:
     for i in range(1, ny-1):
         d_x[i,1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dy*dy)
-        d_x[i,0] = u[i,0]
-        d_x[i,-1] = u[i,-1]
 
     solver_x.solve(d_x[1:-1,:].ravel())
     u = d_x.transpose()
@@ -54,8 +52,6 @@ for step in range(100):
     # Implicit y, explicit x:
     for i in range(1, nx-1):
         d_y[i,1:-1] = -2*u[i,1:-1]/dt - (u[i-1,1:-1] - 2*u[i,1:-1] + u[i+1,1:-1])/(dx*dx)
-        d_y[i,0] = u[i,0]
-        d_y[i,-1] = u[i,-1]
     
     solver_y.solve(d_y[1:-1,:].ravel())
     u = d_y.transpose()
