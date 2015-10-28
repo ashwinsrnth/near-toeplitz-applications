@@ -26,7 +26,7 @@ def tridiagonal_solve(a, b, c, rhs):
     return x
 
 L = 1.0
-N = 2048
+N = 256
 dx = L/(N-1)
 dt = 0.1
 
