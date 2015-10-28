@@ -56,6 +56,10 @@ for step in range(100):
     solver_y.solve(d_y[1:-1,:].ravel())
     u = d_y.transpose()
 
-plt.pcolor(u)
+print 'Plotting...'
+import colormaps as cmaps
+plt.register_cmap(name='inferno', cmap=cmaps.inferno)
+plt.set_cmap(cmaps.inferno)
+plt.pcolormesh(u)
 plt.colorbar()
 plt.savefig('temp.png')
