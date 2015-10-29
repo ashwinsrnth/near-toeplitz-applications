@@ -5,9 +5,9 @@ from pycuda import autoinit
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
 
+from neato import NearToeplitzSolver
 from adi.transpose import transpose
 from adi.rhs import compute_rhs
-from adi.neato import NearToeplitzSolver
 
 def tridiagonal_solve(a, b, c, rhs):
     '''
