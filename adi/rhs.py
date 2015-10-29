@@ -3,7 +3,7 @@ from pycuda import autoinit
 import pycuda.driver as cuda
 import pycuda.compiler as compiler
 import pycuda.gpuarray as gpuarray
-from pycuda.tools import context_dependent_memoize, clear_context_caches
+from pycuda.tools import context_dependent_memoize
 import jinja2
 
 kernel_template = """

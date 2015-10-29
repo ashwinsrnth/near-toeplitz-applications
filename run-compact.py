@@ -1,5 +1,10 @@
 import numpy as np
 from scipy.linalg import solve_banded
+from pycuda import autoinit
+import pycuda.gpuarray as gpuarray
+
+from neato import NearToeplitzSolver
+from compact.rhs import compute_rhs
 
 def tridiagonal_solve(a, b, c, rhs):
     '''
@@ -27,25 +32,15 @@ z, y, x = np.meshgrid(np.linspace(0, L, N),
         np.linspace(0, L, N),
         np.linspace(0, L, N),
         indexing='ij')
-
 f = fun(x, y, z)
+f_d = gpuarray.to_gpu(f)
+d_d = gpuarray.zeros(f.shape, dtype=np.float64)
+nz, ny, nx = f.shape
+solver = NearToeplitzSolver(nx, nz*ny, (1., 2., 1./4, 1., 1./4, 2., 1.))
+compute_rhs(f_d, d_d, dx)
+solver.solve(d_d)
 
-dfdx = np.zeros_like(f, dtype=np.float64)
-
-a = np.ones(N, dtype=np.float64)*1./4
-b = np.ones(N, dtype=np.float64)*1.
-c = np.ones(N, dtype=np.float64)*1./4
-d = np.zeros_like(a, dtype=np.float64)
-c[0] = 2.0
-a[-1] = 2.0
-
-for i in range(N):
-    for j in range(N):
-        d[1:-1] = (3./(4*dx))*(f[i,j,2:] - f[i,j,:-2])
-        d[0] = (1./(2*dx))*(-5*f[i,j,0] + 4*f[i,j,1] + f[i,j,2])
-        d[-1] = -(1./(2*dx))*(-5*f[i,j,-1] + 4*f[i,j,-2] + f[i,j,-3])
-        dfdx[i, j, :] = tridiagonal_solve(a, b, c, d)
-
+dfdx = d_d.get()
 import matplotlib.pyplot as plt
 plt.plot(x[0, 0, :], f[0, 0, :])
 plt.plot(x[0, 0, :], dfdx[0, 0, :])
