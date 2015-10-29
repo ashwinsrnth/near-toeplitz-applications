@@ -7,7 +7,7 @@ import pycuda.gpuarray as gpuarray
 
 from adi.transpose import transpose
 from adi.rhs import compute_rhs
-from adi.neato import near_toeplitz
+from adi.neato import NearToeplitzSolver
 
 def tridiagonal_solve(a, b, c, rhs):
     '''
@@ -41,9 +41,9 @@ d_x_gpu = gpuarray.to_gpu(d_x)
 d_y_gpu = gpuarray.to_gpu(d_y)
 
 # Initialize tridiagonal solvers
-solver_x = near_toeplitz.NearToeplitzSolver(N, N-2,
+solver_x = NearToeplitzSolver(N, N-2,
         (1., 0., 1./(dx*dx), -2.*(1./dt + 1./(dx*dx)), 1./(dx*dx), 0., 1.))
-solver_y = near_toeplitz.NearToeplitzSolver(N, N-2,
+solver_y = NearToeplitzSolver(N, N-2,
         (1., 0., 1./(dx*dx), -2.*(1./dt + 1./(dx*dx)), 1./(dx*dx), 0., 1.))
 
 # Time marching:

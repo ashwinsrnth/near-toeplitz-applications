@@ -1,33 +1,134 @@
 import pycuda.gpuarray as gpuarray
 import pycuda.driver as cuda
 import numpy as np
-import kernels
+import jinja2
+import pycuda.compiler as compiler
 
-'''
-A tridiagonal solver for solving
-the tridiagonal system that arises in the evaulation
-of derivatives using compact finite-difference schemes.
+kernel_template = """
+__global__ void sharedMemCyclicReduction( double *a_d,
+                                double *b_d,
+                                double *c_d,
+                                double *d_d,
+                                double *k1_d,
+                                double *k2_d,
+                                double *b_first_d,
+                                double *k1_first_d,
+                                double *k1_last_d,
+                                const double b1,
+                                const double c1,
+                                const double ai,
+                                const double bi,
+                                const double ci)
+                                {
+    /*
 
-For example, our solver handles the tridiagonal system
-for the following tridiagonal scheme:
+    */
+    __shared__ double d_l[{{shared_size | int}}];
 
-alpha(f'[i-1] - f'[i+1]) + f'[i] = a(f[i+1] - f[i-1])/dx
+    int tix = threadIdx.x; 
+    int offset = blockIdx.x*{{n}};
+    int i, j, k;
+    int idx;
+    double d_j, d_k;
 
-With alpha=1/4, a=3/4
+    /* When loading to shared memory, perform the first
+       reduction step */
+    idx = 0;
+    if (tix == 0) {
+        d_l[tix] = d_d[offset+2*tix+1] - \
+                    d_d[offset+2*tix]*k1_first_d[idx] - \
+                    d_d[offset+2*tix+2]*k2_d[idx];
+    }
+    else if (tix == ({{(n/2) | int}}-1)) {
+        d_l[tix] = d_d[offset+2*tix+1] - \
+                    d_d[offset+2*tix]*k1_last_d[idx];
+    }
+    else {
+        d_l[tix] = d_d[offset+2*tix+1] - \
+                    d_d[offset+2*tix]*k1_d[idx] - \
+                    d_d[offset+2*tix+2]*k2_d[idx];
+    }
+    __syncthreads();
+    
+    /* First step of reduction is complete and 
+       the coefficients are in shared memory */
+    
+    /* Do the remaining forward reduction steps: */
+    for (int stride=2; stride<{{(n/2) | int}}; stride=stride*2) {
+        idx = idx + 1;
+        i = (stride-1) + tix*stride;
+        if (tix < {{n}}/(2*stride)) {
+            if (tix == 0) {
+                d_l[i] = d_l[i] - \
+                            d_l[i-stride/2]*k1_first_d[idx] - \
+                            d_l[i+stride/2]*k2_d[idx];
+            }
+            else if (i == ({{n}}/2-1)) {
+                d_l[i] = d_l[i] - \
+                             d_l[i-stride/2]*k1_last_d[idx];
+            }
+            else {
+                d_l[i] = d_l[i] - d_l[i-stride/2]*k1_d[idx] - \
+                            d_l[i+stride/2]*k2_d[idx];
+            }
+        }
+        __syncthreads();
+    }
 
-Along with the following implicit equation at the boundaries:
+    if (tix == 0) {
+        j = rint(log2((float) {{(n/2) | int}})) - 1;
+        k = rint(log2((float) {{(n/2) | int}}));
 
-f'[1] + 2f'[2] =  (-5f[1] + 4f[2] + f[3])/2dx
+        d_j = (d_l[{{n}}/4-1]*b_d[k] - \
+               c_d[j]*d_l[{{n}}/2-1])/ \
+            (b_first_d[j]*b_d[k] - c_d[j]*a_d[k]);
 
-The tridiagonal system is then of the form:
+        d_k = (b_first_d[j]*d_l[{{n}}/2-1] - \
+               d_l[{{n}}/4-1]*a_d[k])/ \
+            (b_first_d[j]*b_d[k] - c_d[j]*a_d[k]);
 
-1       2       .       .       .       .
-1/ 4    1       1/4     .       .       .
-.       1/4     1       1/4     .       .
-.       .       1/4     1       1/4     .
-.       .       .       1/4     1       1/4
-.       .       .       .       2       1
-'''
+        d_l[{{n}}/4-1] = d_j;
+        d_l[{{n}}/2-1] = d_k;
+    }
+    __syncthreads();
+    
+    idx = rint(log2((float) {{n}}))-2;
+    for (int stride={{n}}/4; stride>1; stride=stride/2) {
+        idx = idx - 1;
+        i = (stride/2-1) + tix*stride;
+        if (tix < {{n}}/(2*stride)){
+            if (tix == 0) {
+                d_l[i] = (d_l[i] - c_d[idx]*d_l[i+stride/2])/\
+                            b_first_d[idx];
+            }
+            else {
+                d_l[i] = (d_l[i] - a_d[idx]*d_l[i-stride/2] -\
+                            c_d[idx]*d_l[i+stride/2])/b_d[idx];
+            }
+        }
+        __syncthreads();
+    }
+
+    //When writing from shared memory, perform the last
+    //substitution step
+    if (tix == 0) {
+        d_d[offset+2*tix] = (d_d[offset+2*tix] - c1*d_l[tix])/b1;
+        d_d[offset+2*tix+1] = d_l[tix];
+    }
+    else {
+        d_d[offset+2*tix] = (d_d[offset+2*tix] - \
+                                ai*d_l[tix-1] - ci*d_l[tix])/bi;
+        d_d[offset+2*tix+1] = d_l[tix];
+    } 
+    
+    __syncthreads();
+}
+
+
+
+"""
+
+
 
 class NearToeplitzSolver:
 
@@ -60,8 +161,12 @@ class NearToeplitzSolver:
         self.k1_first_d = gpuarray.to_gpu(k1_first)
         self.k1_last_d = gpuarray.to_gpu(k1_last)
         
-        kernels.render_kernel('kernels.jinja2', 'kernels.gen', n=self.n, shared_size=self.n/2)
-        self.cyclic_reduction, = kernels.get_funcs('kernels.gen', 'sharedMemCyclicReduction') 
+        tpl = jinja2.Template(kernel_template)
+        rendered_kernel = tpl.render(n=self.n, shared_size=self.n/2)
+        module = compiler.SourceModule(rendered_kernel,
+                options=['-O2'])
+        self.cyclic_reduction = module.get_function(
+            'sharedMemCyclicReduction')
         self.cyclic_reduction.prepare('PPPPPPPPPddddd')
         
     def solve(self, x_d):
