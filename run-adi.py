@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from scipy.linalg import solve_banded
 import matplotlib.pyplot as plt
@@ -25,8 +26,12 @@ def tridiagonal_solve(a, b, c, rhs):
     x = solve_banded(l_and_u, ab, rhs)
     return x
 
+if len(sys.argv) == 2:
+    N = int(sys.argv[1])
+else:
+    N = 256
+
 L = 1.0
-N = 256
 dx = L/(N-1)
 dt = 0.1
 
@@ -49,9 +54,11 @@ solver_y = NearToeplitzSolver(N, N-2,
 # Time marching:
 start = cuda.Event()
 end = cuda.Event()
-start.record()
 
-for step in range(1000):
+nsteps = 100
+for step in range(nsteps):
+    if step == 1:
+        start.record()
     # Implicit x, explicit y:
     compute_rhs(u_gpu, d_x_gpu, dx, dt, N) 
     solver_x.solve(d_x_gpu[1, 0])
@@ -61,13 +68,12 @@ for step in range(1000):
     compute_rhs(u_gpu, d_y_gpu, dx, dt, N)
     solver_y.solve(d_y_gpu[1, 0])
     transpose(d_y_gpu, u_gpu, N)
-
 end.record()
 end.synchronize()
 time_in_ms = start.time_till(end)
-time_per_step_in_ms = time_in_ms/1000
-print 'Time per step: ', time_per_step_in_ms
-u = u_gpu.get()
+time_per_step_in_ms = time_in_ms/nsteps
+
+print 'Problem size: {0}; Time per step: {1} ms'.format(N, time_per_step_in_ms)
 
 #print 'Plotting...'
 #import colormaps as cmaps
