@@ -1,10 +1,13 @@
 import numpy as np
+from numpy import sin, cos
 from scipy.linalg import solve_banded
 from pycuda import autoinit
 import pycuda.gpuarray as gpuarray
+import pycuda.driver as cuda
 
 from neato import NearToeplitzSolver
 from compact.rhs import compute_rhs
+from compact.permute import permute
 
 def tridiagonal_solve(a, b, c, rhs):
     '''
@@ -23,9 +26,9 @@ def tridiagonal_solve(a, b, c, rhs):
     return x
 
 def fun(x, y, z):
-    return np.sin(x)
+    return sin(x) + 2*sin(y) + 3*sin(z)
 
-N = 32
+N = 256
 L = 2*np.pi
 dx = L/(N-1)
 z, y, x = np.meshgrid(np.linspace(0, L, N),
@@ -34,14 +37,64 @@ z, y, x = np.meshgrid(np.linspace(0, L, N),
         indexing='ij')
 f = fun(x, y, z)
 f_d = gpuarray.to_gpu(f)
-d_d = gpuarray.zeros(f.shape, dtype=np.float64)
-nz, ny, nx = f.shape
-solver = NearToeplitzSolver(nx, nz*ny, (1., 2., 1./4, 1., 1./4, 2., 1.))
-compute_rhs(f_d, d_d, dx)
-solver.solve(d_d)
+dfdx_d = gpuarray.zeros(f.shape, dtype=np.float64)
+dfdy_d = gpuarray.zeros(f.shape, dtype=np.float64)
+dfdz_d = gpuarray.zeros(f.shape, dtype=np.float64)
+tmp_d = gpuarray.zeros(f.shape, dtype=np.float64)
 
-dfdx = d_d.get()
-import matplotlib.pyplot as plt
-plt.plot(x[0, 0, :], f[0, 0, :])
-plt.plot(x[0, 0, :], dfdx[0, 0, :])
-plt.savefig('deriv.png')
+# dfdx:
+solver = NearToeplitzSolver(N, N*N, (1., 2., 1./4, 1., 1./4, 2., 1.))
+
+start = cuda.Event()
+end = cuda.Event()
+
+# dfdx:
+nsteps = 100
+
+total_time = 0
+for i in range(nsteps):
+    start.record()
+    compute_rhs(f_d, dfdx_d, dx)
+    solver.solve(dfdx_d)
+    end.record()
+    end.synchronize()
+    total_time += start.time_till(end)
+print total_time/nsteps
+
+# dfdy:
+total_time = 0
+for i in range(nsteps):
+    start.record()
+    permute(f_d, dfdy_d, (0, 2, 1))
+    compute_rhs(dfdy_d, tmp_d, dx)
+    solver.solve(tmp_d)
+    permute(tmp_d, dfdy_d, (0, 2, 1))
+    end.record()
+    end.synchronize()
+    total_time += start.time_till(end)
+print total_time/nsteps
+
+# dfdz:
+total_time = 0
+for i in range(nsteps):
+    start.record()
+    permute(f_d, dfdz_d, (1, 2, 0))
+    compute_rhs(dfdz_d, tmp_d, dx)
+    solver.solve(tmp_d)
+    permute(tmp_d, dfdz_d, (2, 0, 1))
+    end.record()
+    end.synchronize()
+    total_time += start.time_till(end)
+print total_time/nsteps
+
+#dfdx_true = cos(x)
+#dfdy_true = 2*cos(y)
+dfdz_true = 3*cos(z)
+#dfdx = dfdx_d.get()
+#dfdy = dfdy_d.get()
+dfdz = dfdz_d.get()
+
+from numpy.testing import assert_allclose
+#assert_allclose(dfdx_true, dfdx, rtol=1e-1)
+#assert_allclose(dfdy_true, dfdy, rtol=1e-1)
+assert_allclose(dfdz_true, dfdz, rtol=1e-1)
