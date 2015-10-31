@@ -30,17 +30,16 @@ line_da = da.get_line_DA(0)
 line_rank = line_da.rank
 line_size = line_da.size
 
+coeffs = [1., 1./4, 1./4, 1., 1./4, 1./4, 1.]
 if line_rank == 0:
-    coeffs = (1., 2., 1./4, 1., 1./4, 1./4, 1.)
-elif line_rank == line_size-1:
-    coeffs = (1., 1./4, 1./4, 1., 1./4, 2., 1.)
-else:
-    coeffs = (1., 1./4, 1./4, 1., 1./4, 1./4, 1.)
+    coeffs[1] = 2
+if line_rank == line_size-1:
+    coeffs[-2] = 2
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
 da.global_to_local(f_d, f_local_d)
 compute_RHS(f_local_d, x_d, dx, (N, N, N), line_rank, line_size)
-xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size)
+xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
 solver.solve(x_d)
 alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
 sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))

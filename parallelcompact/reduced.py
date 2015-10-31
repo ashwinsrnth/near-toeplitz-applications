@@ -148,7 +148,6 @@ def get_params(line_da, xU_d, xL_d, xR_d):
     xR_faces_d = gpuarray.zeros((2, nz, ny), np.float64)
     negate_and_copy_faces(xR_d, xR_faces_d,
         (nz, ny, nx), line_rank, line_size)
-
     xR_faces_line_d = gpuarray.zeros((2*line_size, nz, ny),
             dtype=np.float64)
 
@@ -179,9 +178,12 @@ def get_params(line_da, xU_d, xL_d, xR_d):
         b_reduced_d = gpuarray.to_gpu(b_reduced)
         c_reduced_d = gpuarray.to_gpu(c_reduced)
         c2_reduced_d = gpuarray.to_gpu(c_reduced)
-
+        
         solve_reduced(a_reduced_d, b_reduced_d,
                 c_reduced_d, c2_reduced_d, xR_faces_line_d, (2*line_size, nz, ny))
+        
+        print xR_faces_line_d.get()[:, 15, 15]
+
     line_da.scatter(
       [xR_faces_line_d.gpudata.as_buffer(xR_faces_line_d.nbytes),
             2*nz*ny, MPI.DOUBLE], 

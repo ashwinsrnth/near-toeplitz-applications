@@ -18,20 +18,23 @@ def tridiagonal_solve(a, b, c, rhs):
     x = solve_banded(l_and_u, ab, rhs)
     return x
 
-def solve_secondary_systems(nx, rank, size):
-    a = np.ones(nx, dtype=np.float64)
-    b = np.ones(nx, dtype=np.float64)
-    c = np.ones(nx, dtype=np.float64)
+def solve_secondary_systems(nx, rank, size, coeffs):
+    b1, c1, ai, bi, ci, an, bn = coeffs
+    a = np.ones(nx, dtype=np.float64)*coeffs[2]
+    b = np.ones(nx, dtype=np.float64)*coeffs[3]
+    c = np.ones(nx, dtype=np.float64)*coeffs[4]
     rU = np.zeros(nx, dtype=np.float64)
     rL = np.zeros(nx, dtype=np.float64)
 
     if rank == 0:
-        c[0] = 2.0
         a[0] = 0.0
+        b[0] = coeffs[0]
+        c[0] = coeffs[1]
 
     if rank == size-1:
-        a[-1] = 2.0
-        c[-1] = 0.0
+        a[-1] = coeffs[-2]
+        b[-1] = coeffs[-1]
+        c[-1] = 0.
 
     rU[0] = -a[0]
     rL[-1] = -c[-1]
