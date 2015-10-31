@@ -36,17 +36,16 @@ def _get_sum_kernel():
     module = compiler.SourceModule(kernel_text, options=['-O2'])
     sum_kernel = module.get_function(
         'sumSolutionsKernel')
-    sum_kernel.prepare('PPPdd')
+    sum_kernel.prepare('PPPPP')
     return sum_kernel
 
-def sum_solutions(x_UH, x_LH, X_R, alpha, beta, shape):
+def sum_solutions(x_UH, x_LH, x_R, alpha, beta, shape):
     nz, ny, nx = shape
-    sum_solutions.prepared_call((nx/8, ny/8, nx/8),
-            (8, 8, 8)
+    sum_kernel = _get_sum_kernel()
+    sum_kernel.prepared_call((nx/8, ny/8, nx/8),
+            (8, 8, 8),
             x_R.gpudata,
             x_UH.gpudata,
             x_LH.gpudata,
             alpha.gpudata,
-            beta.gpudata,
-            nx, ny, nz)
-
+            beta.gpudata)

@@ -2,13 +2,16 @@ import numpy as np
 from mpi4py import MPI
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
-from neato import NearToeplitzSolver
+from numpy.testing import *
 
+from neato import NearToeplitzSolver
 
 import parallelcompact.init
 from parallelcompact.da import DA, DA_arange
 from parallelcompact.rhs import compute_RHS
 from parallelcompact.misc import solve_secondary_systems
+from parallelcompact.reduced import get_params
+from parallelcompact.sum import sum_solutions
 
 N = 32
 comm = MPI.COMM_WORLD
@@ -35,9 +38,12 @@ else:
     coeffs = (1., 1./4, 1./4, 1., 1./4, 1./4, 1.)
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
-
 da.global_to_local(f_d, f_local_d)
 compute_RHS(f_local_d, x_d, dx, (N, N, N), line_rank, line_size)
 xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size)
 solver.solve(x_d)
+alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
+sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
 
+dfdx = x_d.get()
+assert_allclose(dfdx, y*z)
