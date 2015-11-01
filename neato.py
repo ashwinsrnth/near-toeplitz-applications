@@ -120,12 +120,8 @@ __global__ void sharedMemCyclicReduction( double *a_d,
                                 ai*d_l[tix-1] - ci*d_l[tix])/bi;
         d_d[offset+2*tix+1] = d_l[tix];
     } 
-    
     __syncthreads();
 }
-
-
-
 """
 
 

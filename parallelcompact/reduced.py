@@ -118,6 +118,9 @@ def _get_reduced_solver_kernel():
     return reduced_solver_kernel
 
 def solve_reduced(a_d, b_d, c_d, c2_d, x_d, shape):
+    '''
+    Solves systems aligned along the z-axis.
+    '''
     nz, ny, nx = shape
     reduced_solver_kernel = _get_reduced_solver_kernel()
     reduced_solver_kernel.prepared_call(
@@ -137,6 +140,9 @@ def get_params(line_da, xU_d, xL_d, xR_d):
     line_size = line_da.size
     xU_line = np.zeros(2*line_size, dtype=np.float64)
     xL_line = np.zeros(2*line_size, dtype=np.float64)
+    xR_faces_d = gpuarray.zeros((2, nz, ny), np.float64)
+    xR_faces_line_d = gpuarray.zeros((2*line_size, nz, ny),
+            dtype=np.float64)
 
     line_da.gather(
             [np.array([xU[0], xU[-1]]), 2, MPI.DOUBLE],
@@ -145,11 +151,8 @@ def get_params(line_da, xU_d, xL_d, xR_d):
             [np.array([xL[0], xL[-1]]), 2, MPI.DOUBLE],
             [xL_line, 2, MPI.DOUBLE])
 
-    xR_faces_d = gpuarray.zeros((2, nz, ny), np.float64)
     negate_and_copy_faces(xR_d, xR_faces_d,
         (nz, ny, nx), line_rank, line_size)
-    xR_faces_line_d = gpuarray.zeros((2*line_size, nz, ny),
-            dtype=np.float64)
 
     line_da.gather(
         [xR_faces_d.gpudata.as_buffer(xR_faces_d.nbytes),
@@ -181,9 +184,7 @@ def get_params(line_da, xU_d, xL_d, xR_d):
         
         solve_reduced(a_reduced_d, b_reduced_d,
                 c_reduced_d, c2_reduced_d, xR_faces_line_d, (2*line_size, nz, ny))
-        
-        print xR_faces_line_d.get()[:, 15, 15]
-
+     
     line_da.scatter(
       [xR_faces_line_d.gpudata.as_buffer(xR_faces_line_d.nbytes),
             2*nz*ny, MPI.DOUBLE], 
