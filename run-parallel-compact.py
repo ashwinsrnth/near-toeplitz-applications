@@ -33,7 +33,7 @@ class Timer:
 N = 256
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-da = DA(comm, (N, N, N), (2, 2, 2), 1)
+da = DA(comm, (N, N, N), (4, 4, 4), 1)
 x, y, z = DA_arange(da, (0, 1), (0, 1), (0, 1))
 f = x*y*z
 dx = x[0, 0, 1] - x[0, 0, 0]
@@ -44,6 +44,8 @@ y_d = da.create_global_vector()
 z_d = da.create_global_vector()
 f_local_d = da.create_local_vector()
 
+nsteps = 100
+timer = Timer(comm)
 
 # dfdx
 line_da = da.get_line_DA(0)
@@ -57,8 +59,6 @@ if line_rank == line_size-1:
     coeffs[-2] = 2
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
-nsteps = 100
-timer = Timer(comm)
 
 for step in range(nsteps+1):
     if step == 1:
@@ -116,7 +116,7 @@ if line_rank == line_size-1:
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
 
-for i in range(nsteps+1):
+for step in range(nsteps+1):
     if step == 1:
         timer.tic()
     permute(f_d, x_d, (1, 2, 0))
