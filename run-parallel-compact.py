@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from mpi4py import MPI
 import pycuda.driver as cuda
@@ -30,10 +31,12 @@ class Timer:
         self.t2 = MPI.Wtime()
         return self.t2 - self.t1
 
-N = 256
+N = int(sys.argv[1]) # local size per dim
+p = int(sys.argv[2]) # procs per dim
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-da = DA(comm, (N, N, N), (4, 4, 4), 1)
+da = DA(comm, (N, N, N), (p, p, p), 1)
 x, y, z = DA_arange(da, (0, 1), (0, 1), (0, 1))
 f = x*y*z
 dx = x[0, 0, 1] - x[0, 0, 0]
