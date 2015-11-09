@@ -32,14 +32,18 @@ class Timer:
         return self.t2 - self.t1
 
 N = int(sys.argv[1]) # local size per dim
-p = int(sys.argv[2]) # procs per dim
+pz = int(sys.argv[2]) # procs per dim
+py = int(sys.argv[3])
+px = int(sys.argv[4])
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-da = DA(comm, (N, N, N), (p, p, p), 1)
+da = DA(comm, (N, N, N), (pz, py, px), 1)
 x, y, z = DA_arange(da, (0, 1), (0, 1), (0, 1))
 f = x*y*z
 dx = x[0, 0, 1] - x[0, 0, 0]
+dy = y[0, 1, 0] - y[0, 0, 0]
+dz = z[1, 0, 0] - z[0, 0, 0]
 
 f_d = gpuarray.to_gpu(f)
 x_d = da.create_global_vector()
@@ -95,7 +99,7 @@ for step in range(nsteps+1):
         timer.tic()
     permute(f_d, x_d, (0, 2, 1))
     line_da.global_to_local(x_d, f_local_d)
-    compute_RHS(f_local_d, x_d, dx, (N, N, N), line_rank, line_size)
+    compute_RHS(f_local_d, x_d, dy, (N, N, N), line_rank, line_size)
     xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
     solver.solve(x_d)
     alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
@@ -124,7 +128,7 @@ for step in range(nsteps+1):
         timer.tic()
     permute(f_d, x_d, (1, 2, 0))
     line_da.global_to_local(x_d, f_local_d)
-    compute_RHS(f_local_d, x_d, dx, (N, N, N), line_rank, line_size)
+    compute_RHS(f_local_d, x_d, dz, (N, N, N), line_rank, line_size)
     xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
     solver.solve(x_d)
     alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
