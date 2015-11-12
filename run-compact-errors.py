@@ -92,7 +92,6 @@ dfdx = dfdx_d.get()
 dfdy = dfdy_d.get()
 dfdz = dfdz_d.get()
 
-from numpy.testing import assert_allclose
-print 'dfdx err: ', np.mean(np.abs(dfdx-dfdx_true))
-print 'dfdy err: ', np.mean(np.abs(dfdy-dfdy_true))
-print 'dfdz err: ', np.mean(np.abs(dfdz-dfdz_true))
+print 'dfdx err: ', np.mean(np.abs((dfdx-dfdx_true)/dfdx_true))
+print 'dfdx err: ', np.mean(np.abs((dfdy-dfdy_true)/dfdy_true))
+print 'dfdx err: ', np.mean(np.abs((dfdz-dfdz_true)/dfdz_true))
