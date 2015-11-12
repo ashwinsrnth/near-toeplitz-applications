@@ -60,7 +60,6 @@ for i in range(nsteps):
     end.record()
     end.synchronize()
     total_time += start.time_till(end)
-print 'dfdx: ', total_time/nsteps
 
 # dfdy:
 total_time = 0
@@ -73,7 +72,6 @@ for i in range(nsteps):
     end.record()
     end.synchronize()
     total_time += start.time_till(end)
-print 'dfdy: ', total_time/nsteps
 
 # dfdz:
 total_time = 0
@@ -86,7 +84,6 @@ for i in range(nsteps):
     end.record()
     end.synchronize()
     total_time += start.time_till(end)
-print 'dfdz: ', total_time/nsteps
 
 dfdx_true = cos(x)
 dfdy_true = 2*cos(y)
@@ -96,6 +93,6 @@ dfdy = dfdy_d.get()
 dfdz = dfdz_d.get()
 
 from numpy.testing import assert_allclose
-assert_allclose(dfdx_true, dfdx, rtol=1e-1)
-assert_allclose(dfdy_true, dfdy, rtol=1e-1)
-assert_allclose(dfdz_true, dfdz, rtol=1e-1)
+print 'dfdx err: ', np.mean(np.abs(dfdx-dfdx_true))
+print 'dfdy err: ', np.mean(np.abs(dfdy-dfdy_true))
+print 'dfdz err: ', np.mean(np.abs(dfdz-dfdz_true))

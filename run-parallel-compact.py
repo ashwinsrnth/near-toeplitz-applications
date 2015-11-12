@@ -77,7 +77,7 @@ for step in range(nsteps+1):
     alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
     sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
 t = timer.toc()
-if rank == 0: print 'dfdx: ', t/nsteps
+if rank == 0: print 'dfdx: ', t*1000/nsteps
 
 dfdx = x_d.get()
 assert_allclose(dfdx, y*z)
@@ -106,7 +106,7 @@ for step in range(nsteps+1):
     sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
     permute(x_d, y_d, (0, 2, 1))
 t = timer.toc()
-if rank == 0: print 'dfdy: ', t/nsteps
+if rank == 0: print 'dfdy: ', t*1000/nsteps
 
 dfdy = y_d.get()
 assert_allclose(dfdy, x*z)
@@ -135,7 +135,7 @@ for step in range(nsteps+1):
     sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
     permute(x_d, z_d, (2, 0, 1))
 t = timer.toc()
-if rank == 0: print 'dfdz: ', t/nsteps
+if rank == 0: print 'dfdz: ', t*1000/nsteps
 
 dfdz = z_d.get()
 assert_allclose(dfdz, x*y)
