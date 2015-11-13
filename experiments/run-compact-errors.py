@@ -11,88 +11,49 @@ from neato import NearToeplitzSolver
 from compact.rhs import compute_rhs
 from compact.permute import permute
 
-def tridiagonal_solve(a, b, c, rhs):
-    '''
-    Solve the tridiagonal system described
-    by a, b, c, and rhs.
-    a: lower off-diagonal array (first element ignored)
-    b: diagonal array
-    c: upper off-diagonal array (last element ignored)
-    rhs: right hand side of the system
-    '''
-    l_and_u = (1, 1)
-    ab = np.vstack([np.append(0, c[:-1]),
-                    b,
-                    np.append(a[1:], 0)])
-    x = solve_banded(l_and_u, ab, rhs)
-    return x
+sizes = (32, 64, 128, 256)
+for i, N in enumerate(sizes):
+    x1 = 2.0
+    xn = 6.0
+    L = xn - x1
+    dx = (L)/(N-1)
+    z, y, x = np.meshgrid(
+                np.linspace(x1, xn,  N),
+                np.linspace(x1, xn,  N),
+                np.linspace(x1, xn,  N),
+                indexing='ij')
 
-def fun(x, y, z):
-    return sin(x) + 2*sin(y) + 3*sin(z)
+    f = sin(x)/x**3
 
-N = int(sys.argv[1])
-L = 2*np.pi
-dx = L/(N-1)
-z, y, x = np.meshgrid(np.linspace(0, L, N),
-        np.linspace(0, L, N),
-        np.linspace(0, L, N),
-        indexing='ij')
-f = fun(x, y, z)
-f_d = gpuarray.to_gpu(f)
-dfdx_d = gpuarray.zeros(f.shape, dtype=np.float64)
-dfdy_d = gpuarray.zeros(f.shape, dtype=np.float64)
-dfdz_d = gpuarray.zeros(f.shape, dtype=np.float64)
-tmp_d = gpuarray.zeros(f.shape, dtype=np.float64)
+    f_d = gpuarray.to_gpu(f)
+    dfdx_d = gpuarray.zeros(f.shape, dtype=np.float64)
 
-# dfdx:
-solver = NearToeplitzSolver(N, N*N, (1., 2., 1./4, 1., 1./4, 2., 1.))
-
-start = cuda.Event()
-end = cuda.Event()
-
-# dfdx:
-nsteps = 100
-
-total_time = 0
-for i in range(nsteps):
-    start.record()
+    solver = NearToeplitzSolver(N, N*N, (1., 2., 1./4, 1., 1./4, 2., 1.))
     compute_rhs(f_d, dfdx_d, dx)
     solver.solve(dfdx_d)
-    end.record()
-    end.synchronize()
-    total_time += start.time_till(end)
+    dfdx = dfdx_d.get()
+    dfdx_true = (x*cos(x) - 3*sin(x))/x**4
 
-# dfdy:
-total_time = 0
-for i in range(nsteps):
-    start.record()
-    permute(f_d, dfdy_d, (0, 2, 1))
-    compute_rhs(dfdy_d, tmp_d, dx)
-    solver.solve(tmp_d)
-    permute(tmp_d, dfdy_d, (0, 2, 1))
-    end.record()
-    end.synchronize()
-    total_time += start.time_till(end)
+    if i == 0:
+        err_last_middle = np.abs(dfdx_true[0, 0, N/2] - dfdx[0, 0, N/2])
+        err_last_boundary = np.abs(dfdx_true[0, 0, 0] - dfdx[0, 0, 0]) 
+        err_last_mean = np.mean(np.abs(dfdx_true[0, 0, :] - dfdx[0, 0, :]))
 
-# dfdz:
-total_time = 0
-for i in range(nsteps):
-    start.record()
-    permute(f_d, dfdz_d, (1, 2, 0))
-    compute_rhs(dfdz_d, tmp_d, dx)
-    solver.solve(tmp_d)
-    permute(tmp_d, dfdz_d, (2, 0, 1))
-    end.record()
-    end.synchronize()
-    total_time += start.time_till(end)
+    else:
+        err_this_middle = np.abs(dfdx_true[0, 0, N/2] - dfdx[0, 0, N/2])
+        err_this_boundary = np.abs(dfdx_true[0, 0, 0] - dfdx[0, 0, 0]) 
+        err_this_mean = np.mean(np.abs(dfdx_true[0, 0, :] - dfdx[0, 0, :]))
+        
+        print 'Mid point: (N={0})/(N={1}) = {2}'.format(
+                sizes[i-1], sizes[i], err_last_middle/err_this_middle)
 
-dfdx_true = cos(x)
-dfdy_true = 2*cos(y)
-dfdz_true = 3*cos(z)
-dfdx = dfdx_d.get()
-dfdy = dfdy_d.get()
-dfdz = dfdz_d.get()
+        print 'Boundary: (N={0})/(N={1}) = {2}'.format(
+                sizes[i-1], sizes[i], err_last_boundary/err_this_boundary)
 
-print 'dfdx err: ', np.mean(np.abs((dfdx-dfdx_true)/dfdx_true))
-print 'dfdx err: ', np.mean(np.abs((dfdy-dfdy_true)/dfdy_true))
-print 'dfdx err: ', np.mean(np.abs((dfdz-dfdz_true)/dfdz_true))
+        print 'Mean: (N={0})/(N={1}) = {2}'.format(
+                sizes[i-1], sizes[i], err_last_mean/err_this_mean)
+
+        err_last_middle = err_this_middle
+        err_last_boundary = err_this_boundary
+        err_last_mean = err_this_mean
+
