@@ -1,4 +1,5 @@
 import sys
+sys.path.append('..')
 import numpy as np
 from scipy.linalg import solve_banded
 import matplotlib.pyplot as plt

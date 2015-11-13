@@ -1,4 +1,5 @@
 import sys
+sys.path.append('..')
 import numpy as np
 from mpi4py import MPI
 import pycuda.driver as cuda

@@ -1,4 +1,5 @@
 import sys
+sys.path.append('..')
 import numpy as np
 from mpi4py import MPI
 import pycuda.driver as cuda
@@ -67,9 +68,15 @@ if line_rank == line_size-1:
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
 
-for step in range(nsteps+1):
-    if step == 1:
-        timer.tic()
+line_da.global_to_local(f_d, f_local_d)
+compute_RHS(f_local_d, x_d, dx, (N, N, N), line_rank, line_size)
+xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
+solver.solve(x_d)
+alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
+sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
+
+timer.tic()
+for step in range(nsteps):
     line_da.global_to_local(f_d, f_local_d)
     compute_RHS(f_local_d, x_d, dx, (N, N, N), line_rank, line_size)
     xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
@@ -94,9 +101,17 @@ if line_rank == line_size-1:
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
 
-for step in range(nsteps+1):
-    if step == 1:
-        timer.tic()
+permute(f_d, x_d, (0, 2, 1))
+line_da.global_to_local(x_d, f_local_d)
+compute_RHS(f_local_d, x_d, dy, (N, N, N), line_rank, line_size)
+xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
+solver.solve(x_d)
+alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
+sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
+permute(x_d, y_d, (0, 2, 1))
+
+timer.tic()
+for step in range(nsteps):
     permute(f_d, x_d, (0, 2, 1))
     line_da.global_to_local(x_d, f_local_d)
     compute_RHS(f_local_d, x_d, dy, (N, N, N), line_rank, line_size)
@@ -123,9 +138,17 @@ if line_rank == line_size-1:
 
 solver = NearToeplitzSolver(N, N*N, coeffs)
 
-for step in range(nsteps+1):
-    if step == 1:
-        timer.tic()
+permute(f_d, x_d, (1, 2, 0))
+line_da.global_to_local(x_d, f_local_d)
+compute_RHS(f_local_d, x_d, dz, (N, N, N), line_rank, line_size)
+xU_d, xL_d = solve_secondary_systems(N, line_rank, line_size, coeffs)
+solver.solve(x_d)
+alpha_d, beta_d = get_params(line_da, xU_d, xL_d, x_d)
+sum_solutions(xU_d, xL_d, x_d, alpha_d, beta_d, (N, N, N))
+permute(x_d, z_d, (2, 0, 1))
+
+timer.tic()
+for step in range(nsteps):
     permute(f_d, x_d, (1, 2, 0))
     line_da.global_to_local(x_d, f_local_d)
     compute_RHS(f_local_d, x_d, dz, (N, N, N), line_rank, line_size)
